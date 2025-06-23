@@ -25,11 +25,11 @@ public class MyApplication extends Application {
         if (allowedPackages.contains(currentPackage)) {
             Log.d("INITIALIZED", "true");
             SentryAndroid.init(this, options -> {
-                options.setDsn();
+                options.setDsn("");
                 options.setEnableAutoActivityLifecycleTracing(true);
                 options.setEnableUserInteractionTracing(true);
                 options.setTracesSampleRate(1.0);
-                options.setRelease("1.0");
+                options.setRelease("4.0");
             });
             Sentry.setTag("package_name", currentPackage);
             appSessionTransaction = Sentry.startTransaction("App Session", "app.session");
