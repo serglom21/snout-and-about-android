@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Snout and About</string>
+    <string-array name="dog_breeds">
+        <item>Select Breed</item>
+        <item>Labrador Retriever</item>
+        <item>German Shepherd</item>
+        <item>Golden Retriever</item>
+        <item>Bulldog</item>
+        <item>Poodle</item>
+        <item>Beagle</item>
+        <item>Pug</item>
+        <item>Mixed Breed</item>
+    </string-array>
+</resources>
