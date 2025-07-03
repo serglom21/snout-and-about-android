@@ -10,41 +10,47 @@ import java.util.List;
 import io.sentry.ITransaction;
 import io.sentry.Sentry;
 import io.sentry.SpanStatus;
-import io.sentry.android.core.SentryAndroid;
-import io.sentry.android.core.SentryAndroidOptions;
 
 public class MyApplication extends Application {
     private ITransaction appSessionTransaction;
+    private static final String TAG = "MyApplication";
 
     @Override
     public void onCreate() {
         super.onCreate();
-        String currentPackage = getPackageName();
+        String currentPackage = BuildConfig.APPLICATION_ID;
         List<String> allowedPackages = Arrays.asList(BuildConfig.ALLOWED_PACKAGE_NAMES.split(","));
 
-        if (allowedPackages.contains(currentPackage)) {
-            Log.d("INITIALIZED", "true");
-            SentryAndroid.init(this, options -> {
-                options.setDsn("");
-                options.setEnableAutoActivityLifecycleTracing(true);
-                options.setEnableUserInteractionTracing(true);
-                options.setTracesSampleRate(1.0);
-                options.setRelease("4.0");
-            });
-            Sentry.setTag("package_name", currentPackage);
-            appSessionTransaction = Sentry.startTransaction("App Session", "app.session");
-        } else {
-            Log.d("SENTRY INITIALIZED", "false");
-        }
+        Log.d(TAG, "Application onCreate called");
+        Log.d(TAG, "Current package: " + currentPackage);
 
+        if (allowedPackages.contains(currentPackage)) {
+            Log.d(TAG, "Application onCreate - Sentry already initialized by ContentProvider");
+            
+            // Sentry is already initialized by SentryInitProvider
+            // Get the app session transaction for potential cleanup
+            appSessionTransaction = SentryInitProvider.getAppSessionTransaction();
+            Log.d(TAG, "Retrieved app session transaction: " + (appSessionTransaction != null ? "exists" : "null"));
+        } else {
+            Log.d(TAG, "Application onCreate - Sentry initialization was skipped (package not in allowed list)");
+        }
     }
 
     // This is tricky and might not be called reliably
     @Override
     public void onTerminate() {
         super.onTerminate();
-        if (appSessionTransaction != null && !appSessionTransaction.isFinished()) {
-            appSessionTransaction.finish(SpanStatus.OK);
-        }
+        Log.d(TAG, "Application onTerminate called");
+        // Finish the app session transaction if it exists and isn't finished
+        SentryInitProvider.finishAppSessionTransaction(SpanStatus.OK);
+    }
+
+    /**
+     * Public method to finish the app session transaction
+     * This can be called from activities when appropriate
+     */
+    public static void finishAppSession() {
+        Log.d(TAG, "finishAppSession called");
+        SentryInitProvider.finishAppSessionTransaction(SpanStatus.OK);
     }
 }

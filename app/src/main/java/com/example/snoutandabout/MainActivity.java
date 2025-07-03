@@ -7,6 +7,7 @@ import androidx.activity.result.ActivityResult;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -40,7 +41,9 @@ public class MainActivity extends AppCompatActivity {
         nextButton = findViewById(R.id.btn_next_step1);
 
         registrationTransaction = Sentry.startTransaction("Registration Journey", "user_journey.registration");
-        Sentry.getCurrentHub().configureScope(scope -> scope.setTransaction(registrationTransaction));
+        Sentry.getCurrentScopes().getScope().setTransaction(registrationTransaction);
+        
+        Log.d("MainActivity", "Created Registration Journey transaction: " + registrationTransaction.getSpanContext().getTraceId());
 
         registrationStepsSpan = registrationTransaction.startChild("registration_steps_flow", "registration.steps");
         waitingForUserInputSpan = registrationStepsSpan.startChild("step1.waiting_for_input", "ui.wait");
@@ -96,6 +99,8 @@ public class MainActivity extends AppCompatActivity {
                     intent.putExtra("sentry_trace_id", registrationStepsSpan.getSpanContext().getTraceId().toString());
                     intent.putExtra("sentry_span_id", registrationStepsSpan.getSpanContext().getSpanId().toString());
                     intent.putExtra("sentry_parent_span_id", registrationStepsSpan.getSpanContext().getParentSpanId().toString());
+                    intent.putExtra("sentry_transaction_name", "Registration Journey");
+                    intent.putExtra("sentry_transaction_operation", "user_journey.registration");
 
                     // 3. Launch the activity for result
                     dogProfileActivityLauncher.launch(intent);

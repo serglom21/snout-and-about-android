@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -43,6 +44,7 @@ public class DogProfileActivity extends AppCompatActivity {
     Button nextButton;
 
     private ISpan dogProfileActivitySpan;
+    private ITransaction registrationTransaction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,31 +53,51 @@ public class DogProfileActivity extends AppCompatActivity {
 
         String traceId = getIntent().getStringExtra("sentry_trace_id");
         String parentSpanId = getIntent().getStringExtra("sentry_span_id");
+        String transactionName = getIntent().getStringExtra("sentry_transaction_name");
+        String transactionOperation = getIntent().getStringExtra("sentry_transaction_operation");
 
-        if (traceId != null && parentSpanId != null) {
+        if (traceId != null && parentSpanId != null && transactionName != null && transactionOperation != null) {
+            // Get the existing Registration Journey transaction from the current scope
+            registrationTransaction = Sentry.getCurrentScopes().getScope().getTransaction();
+            
+            Log.d("DogProfileActivity", "Received transaction info - Name: " + transactionName + ", Operation: " + transactionOperation);
+            Log.d("DogProfileActivity", "Current scope transaction: " + (registrationTransaction != null ? registrationTransaction.getName() : "null"));
+            
+            if (registrationTransaction != null && registrationTransaction.getName().equals(transactionName)) {
+                // Create a span under the existing Registration Journey transaction
+                dogProfileActivitySpan = registrationTransaction.startChild("step2.dog_profile_screen", "registration.step2");
+                Sentry.getCurrentScopes().getScope().setActiveSpan(dogProfileActivitySpan);
+                Log.d("DogProfileActivity", "Continued existing Registration Journey transaction");
+            } else {
+                // Create a new transaction with custom transaction context to continue the journey
+                // This explicitly sets the traceId and parentSpanId to maintain trace continuity
+                PropagationContext propagationContext = new PropagationContext(
+                        new SentryId(traceId),
+                        new SpanId(parentSpanId),
+                        new SpanId(),
+                        null,
+                        null
+                );
+                TransactionContext transactionContext = new TransactionContext(
+                        propagationContext.getTraceId(),
+                        propagationContext.getSpanId(),
+                        propagationContext.getParentSpanId(),
+                        null,
+                        null
+                );
 
-            PropagationContext propagationContext = new PropagationContext(
-                    new SentryId(traceId),
-                    new SpanId(parentSpanId),
-                    new SpanId(),
-                    null,
-                    null
-            );
-            TransactionContext transactionContext = new TransactionContext(
-                    propagationContext.getTraceId(),
-                    propagationContext.getSpanId(),
-                    propagationContext.getParentSpanId(),
-                    null,
-                    null
-            );
-
-            transactionContext.setName("Dog Profile Screen");
-            transactionContext.setOperation("registration.step2");
-
-            dogProfileActivitySpan = Sentry.startTransaction(transactionContext);
-            Sentry.getCurrentScopes().getScope().setActiveSpan(dogProfileActivitySpan);
+                transactionContext.setDescription("Dog Profile Screen");
+                transactionContext.setOperation("registration.step2");
+                
+                // Create the transaction with the custom context
+                dogProfileActivitySpan = Sentry.startTransaction(transactionContext);
+                Sentry.getCurrentScopes().getScope().setActiveSpan(dogProfileActivitySpan);
+                Log.d("DogProfileActivity", "Created new Registration Journey transaction with custom context - TraceId: " + registrationTransaction.getSpanContext().getTraceId() + ", ParentSpanId: " + registrationTransaction.getSpanContext().getParentSpanId());
+            }
         } else {
+            // Fallback: create a standalone transaction if no trace context is provided
             dogProfileActivitySpan = Sentry.startTransaction("Dog Profile Screen", "registration.step2.standalone");
+            Log.d("DogProfileActivity", "Created standalone transaction");
         }
 
         dogNameInput = findViewById(R.id.dog_name_input);
@@ -118,9 +140,19 @@ public class DogProfileActivity extends AppCompatActivity {
                 try {
                     Intent intent = new Intent(DogProfileActivity.this, HydrantPreferencesActivity.class);
 
-                    intent.putExtra("sentry_trace_id", dogProfileActivitySpan.getSpanContext().getTraceId().toString());
-                    intent.putExtra("sentry_span_id", dogProfileActivitySpan.getSpanContext().getSpanId().toString());
-                    intent.putExtra("sentry_parent_span_id", dogProfileActivitySpan.getSpanContext().getParentSpanId().toString());
+                    // Pass the original Registration Journey transaction context
+                    if (registrationTransaction != null) {
+                        intent.putExtra("sentry_trace_id", registrationTransaction.getSpanContext().getTraceId().toString());
+                        intent.putExtra("sentry_span_id", dogProfileActivitySpan.getSpanContext().getSpanId().toString());
+                        intent.putExtra("sentry_parent_span_id", dogProfileActivitySpan.getSpanContext().getParentSpanId().toString());
+                        intent.putExtra("sentry_transaction_name", registrationTransaction.getName());
+                        intent.putExtra("sentry_transaction_operation", registrationTransaction.getOperation());
+                    } else {
+                        // Fallback: pass the current span context
+                        intent.putExtra("sentry_trace_id", dogProfileActivitySpan.getSpanContext().getTraceId().toString());
+                        intent.putExtra("sentry_span_id", dogProfileActivitySpan.getSpanContext().getSpanId().toString());
+                        intent.putExtra("sentry_parent_span_id", dogProfileActivitySpan.getSpanContext().getParentSpanId().toString());
+                    }
 
                     // 1. Set the result for MainActivity: OK means successful
                     setResult(RESULT_OK, intent); // Pass the intent (can contain data if needed)

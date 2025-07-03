@@ -13,6 +13,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SnoutAndAbout"
         tools:targetApi="31">
+        
+        <!-- Sentry Initialization Provider - runs before Application.onCreate() -->
+        <provider
+            android:name=".SentryInitProvider"
+            android:authorities="${applicationId}.sentry-init"
+            android:exported="false" />
+        
         <activity
             android:name=".SwipingActivity"
             android:exported="false" />
